@@ -78,12 +78,12 @@ public class WaterOfArrakisConfig {
      */
     private double jumpToVaultWindowSeconds = 0.8;
     /**
-     * True: while stamina is 0 or less a short "cannot jump" movement effect is kept on the player (the engine
-     * disables the jump control; whether it also stops a vault is not known). False (default): jumping at 0 stamina
-     * is allowed and just costs nothing more, because a player at 0 water cannot recover stamina and could be left
-     * stuck in a pit.
+     * True (default): while stamina is 0 or less, jumping and sprinting are disabled (short movement effects, renewed
+     * while it holds), the same as attacks and blocking, which the game already refuses without stamina. Walking is never
+     * blocked, and a single-block step-up is meant to stay possible (whether the engine's automatic step-up counts as a
+     * jump is not known). Whether a ledge vault is stopped is not known either. False turns this off.
      */
-    private boolean blockJumpAtZeroStamina = false;
+    private boolean blockActionsAtZeroStamina = true;
     /**
      * Base regeneration pauses, in vanilla seconds (the StaminaRegenDelay stat); the stamina rework multiplies every pause
      * by the pause multiplier P. They are ADDITIONS to vanilla for jump, vault and climbing (vanilla has no pause there).
@@ -290,9 +290,9 @@ public class WaterOfArrakisConfig {
                 "Regeneration pause after a vault (an addition to vanilla). 0 = none.");
         b = num(b, "ClimbPauseSeconds", (c, v) -> c.climbPauseSeconds = v, c -> c.climbPauseSeconds,
                 "Regeneration pause held while climbing and after it stops (an addition to vanilla). 0 = none.");
-        b = b.append(new KeyedCodec<>("BlockJumpAtZeroStamina", Codec.BOOLEAN, false),
-                        (c, v) -> c.blockJumpAtZeroStamina = v, c -> c.blockJumpAtZeroStamina)
-                .documentation("Keep a cannot-jump effect on the player while stamina is 0 or less. Off by default: at 0 water stamina cannot recover and a player could be stuck in a pit.")
+        b = b.append(new KeyedCodec<>("BlockActionsAtZeroStamina", Codec.BOOLEAN, false),
+                        (c, v) -> c.blockActionsAtZeroStamina = v, c -> c.blockActionsAtZeroStamina)
+                .documentation("Disable jumping and sprinting while stamina is 0 or less, like attacks and blocking. Walking and single-block step-ups stay possible.")
                 .add();
         b = num(b, "ClimbStaminaCostPerSecond", (c, v) -> c.climbStaminaCostPerSecond = v,
                 c -> c.climbStaminaCostPerSecond,
@@ -472,7 +472,7 @@ public class WaterOfArrakisConfig {
     public double getJumpPauseSeconds() { return jumpPauseSeconds; }
     public double getVaultPauseSeconds() { return vaultPauseSeconds; }
     public double getClimbPauseSeconds() { return climbPauseSeconds; }
-    public boolean isBlockJumpAtZeroStamina() { return blockJumpAtZeroStamina; }
+    public boolean isBlockActionsAtZeroStamina() { return blockActionsAtZeroStamina; }
     public double getClimbStaminaCostPerSecond() { return climbStaminaCostPerSecond; }
     public double getZeroWaterHpPerWaterUnit() { return zeroWaterHpPerWaterUnit; }
     public double getZeroStaminaHpPerStamina() { return zeroStaminaHpPerStamina; }

@@ -1,0 +1,10 @@
+{
+  "$Comment": "Kept on a player at 0 stamina (BlockActionsAtZeroStamina): the engine disables sprinting. Short, so it ends by itself.",
+  "ApplicationEffects": {
+    "MovementEffects": {
+      "DisableSprint": true
+    }
+  },
+  "Duration": 0.4,
+  "OverlapBehavior": "Overwrite"
+}

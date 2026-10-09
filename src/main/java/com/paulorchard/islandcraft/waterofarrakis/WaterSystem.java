@@ -103,6 +103,7 @@ final class WaterSystem extends EntityTickingSystem<EntityStore> {
     /** Built on first use: the component types do not exist yet when the plugin object is created. */
     private Query<EntityStore> query;
     private static final String NO_JUMP_EFFECT = "Arrakis_No_Jump";
+    private static final String NO_SPRINT_EFFECT = "Arrakis_No_Sprint";
     /** The modifier id this mod uses for the out-of-water slow; other mods can see and change it with it. */
     static final String ZERO_WATER_MODIFIER = "Arrakis:ZeroWater";
     /** Thirst damage waiting for {@link ThirstDamageSystem}. */
@@ -530,7 +531,7 @@ final class WaterSystem extends EntityTickingSystem<EntityStore> {
             rt.delayNow = v;
         }
         rt.wasSprinting = sprinting;
-        keepJumpBlocked(cb, ref, rt, cfg, current, dt);
+        keepActionsBlocked(cb, ref, rt, cfg, current, dt);
     }
 
     /** The index of the pause stat, from the engine's sprint-delay resource, else by name. */
@@ -593,22 +594,29 @@ final class WaterSystem extends EntityTickingSystem<EntityStore> {
     }
 
     /**
-     * While stamina is 0 or less (and BlockJumpAtZeroStamina is on) a short Arrakis_No_Jump effect is kept on the player.
-     * It is a plain entity effect with MovementEffects.DisableJump, 0.6 s long, renewed every 0.25 s, so it expires by
-     * itself if this mod stops, and composes with other mods' effects.
+     * While stamina is 0 or less (and BlockActionsAtZeroStamina is on) two short movement effects are kept on the player:
+     * Arrakis_No_Jump (MovementEffects.DisableJump) and Arrakis_No_Sprint (DisableSprint). They last 0.4 s and are renewed
+     * every 0.15 s, so they end by themselves a moment after stamina is above 0, or if this mod stops, and compose with
+     * other mods' effects. Attacks and guarding are already refused without stamina by the game (their interactions
+     * start with a StatsCondition on stamina).
      */
-    private void keepJumpBlocked(CommandBuffer<EntityStore> cb, Ref<EntityStore> ref, Runtime rt, WaterOfArrakisConfig cfg,
-                                 float stamina, float dt) {
+    private void keepActionsBlocked(CommandBuffer<EntityStore> cb, Ref<EntityStore> ref, Runtime rt,
+                                    WaterOfArrakisConfig cfg, float stamina, float dt) {
         rt.blockTimer -= dt;
-        if (!cfg.isBlockJumpAtZeroStamina() || stamina > 0 || rt.blockTimer > 0) {
+        if (!cfg.isBlockActionsAtZeroStamina() || stamina > 0 || rt.blockTimer > 0) {
             return;
         }
-        EntityEffect effect = EntityEffect.getAssetMap().getAsset(NO_JUMP_EFFECT);
         EffectControllerComponent controller = cb.getComponent(ref, EffectControllerComponent.getComponentType());
-        if (effect != null && controller != null) {
-            controller.addEffect(ref, effect, 0.6f, OverlapBehavior.OVERWRITE, cb);
-            rt.blockTimer = 0.25;
+        if (controller == null) {
+            return;
         }
+        for (String id : new String[] {NO_JUMP_EFFECT, NO_SPRINT_EFFECT}) {
+            EntityEffect effect = EntityEffect.getAssetMap().getAsset(id);
+            if (effect != null) {
+                controller.addEffect(ref, effect, 0.4f, OverlapBehavior.OVERWRITE, cb);
+            }
+        }
+        rt.blockTimer = 0.15;
     }
 
     private void updateHud(Player p, PlayerRef player, WaterState state, Runtime rt, WaterOfArrakisConfig cfg) {

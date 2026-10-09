@@ -113,7 +113,7 @@ public class WaterOfArrakisPlugin extends JavaPlugin {
                 missing.append(' ').append(id);
             }
         }
-        for (String effect : new String[] {"Arrakis_No_Jump", WaterSystem.slowId(5), WaterSystem.slowId(90), WaterSystem.slowId(95)}) {
+        for (String effect : new String[] {"Arrakis_No_Jump", "Arrakis_No_Sprint", WaterSystem.slowId(5), WaterSystem.slowId(90), WaterSystem.slowId(95)}) {
             if (EntityEffect.getAssetMap().getIndex(effect) == Integer.MIN_VALUE) {
                 missing.append(' ').append(effect);
             }

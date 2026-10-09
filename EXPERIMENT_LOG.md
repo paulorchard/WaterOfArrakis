@@ -314,3 +314,19 @@ Decisions from the review of Part 1: all base pauses 0.5 s (sprint end, jump, va
 7. Attacks, guard, dodge cost stamina exactly as vanilla.
 8. No tier discounts anywhere: sprint at 100% water costs stamina again.
 9. The damage and the slow at 0 water and 0 stamina still work; `/staminacurve` prints the tables.
+
+## No jump, vault or sprint at 0 stamina
+
+**Question: does the game already refuse stamina actions at 0 stamina?** Checked in the 0.6.8 assets:
+- **Attacks: yes, on the server.** Weapon primary interactions start with a `StatsCondition` with `Costs: {Stamina: x}` (the sword thrust needs 0.1, the downstrike and mace charge their own), and the interaction takes its `Failed` branch (a weaker chain attack, or nothing) when the stamina is not there.
+- **Blocking (guard): yes.** `Common_Guard_Entry_StaminaCondition` needs 0.5 stamina and `Stamina_Broken` not on the player, else `Common_Stamina_Insufficient`.
+- **Sprinting: no server rule found.** The sprint drain in `Stamina.json` is clamped at 0; nothing in the assets or the server code stops the sprint flag. Whether the client stops it at 0 is not something the server files show, so it is not confirmed. In 0.6.8 the `Stamina_Broken` effect is just a marker and an icon.
+- **Jump and vault: no rule** (vanilla has no stamina cost for them).
+
+**Change:** `BlockActionsAtZeroStamina` (default true; replaces `BlockJumpAtZeroStamina`, whose saved value false would have kept it off) now keeps two short movement effects on a player whose stamina is 0 or less: `Arrakis_No_Jump` (`DisableJump`) and the new `Arrakis_No_Sprint` (`DisableSprint`), 0.4 s each and renewed every 0.15 s, so they end a moment after stamina is above 0. Walking is never blocked. Attacks and guarding are left to the game.
+
+**Not known (not tested; needs the game):**
+- Whether the automatic **single-block step-up** (`AutoJumpObstacle*` in the movement config) counts as a jump and is stopped by `DisableJump`. The request is that it stays possible. If it is blocked, set `BlockActionsAtZeroStamina` to false and tell me, and the alternative is blocking only sprint and the jump key some other way.
+- Whether `DisableJump` also stops a **ledge vault** (the engine's mantling state). There is no separate "disable mantle" movement effect (`DisableAll`, `DisableForward/Backward/Left/Right`, `DisableSprint`, `DisableJump`, `DisableCrouch` and `SpeedMultiplier` are the only fields).
+- Whether the client already stopped sprinting at 0 stamina (then the sprint block changes nothing).
+- A player at 0 water and 0 stamina with these blocks cannot jump out of a pit deeper than one block (water 0 keeps stamina at 0). That was the reason the block was off by default before. The HP cost for jumping and vaulting at 0/0 therefore only applies where the block fails (and to climbing, whose cost is 0 by default).
