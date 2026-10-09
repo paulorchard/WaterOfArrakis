@@ -175,7 +175,8 @@ final class WaterSystem extends TickingSystem<EntityStore> {
             rt.secondsOutOfSun = 0;
         }
         if (inShade && rt.secondsOutOfSun >= cfg.getExposureGraceSeconds()) {
-            rate = -cfg.getExposureDecayPerSecond() * service.getModifier(id, ModifierType.EXPOSURE_DECAY_MULTIPLIER);
+            rate = -cfg.getExposureDecayPerSecond() * cfg.getShadeRecoveryMultiplier()
+                    * service.getModifier(id, ModifierType.EXPOSURE_DECAY_MULTIPLIER);
         } else {
             rate = cfg.getExposureGainPerSecond() * fraction * service.getModifier(id, ModifierType.EXPOSURE_GAIN_MULTIPLIER);
         }

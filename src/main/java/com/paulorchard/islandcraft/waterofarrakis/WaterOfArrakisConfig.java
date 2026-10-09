@@ -26,6 +26,8 @@ public class WaterOfArrakisConfig {
     private double exposureGainPerSecond = 1.0;
     /** Exposure lost per second once the grace period out of the sun has passed. */
     private double exposureDecayPerSecond = 1.0;
+    /** Cooling in the shade is this many times ExposureDecayPerSecond (comfort: recovery is faster than heating). */
+    private double shadeRecoveryMultiplier = 2.0;
     /** Continuous seconds out of the sun before exposure starts to decay. */
     private double exposureGraceSeconds = 5.0;
     /** Day counts as "sun up" when the world's sunlight factor (0 night .. 1 midday) is at least this. */
@@ -155,6 +157,8 @@ public class WaterOfArrakisConfig {
                 "Exposure gained per second in direct sun (1.0 = 100 s to fill).");
         b = num(b, "ExposureDecayPerSecond", (c, v) -> c.exposureDecayPerSecond = v, c -> c.exposureDecayPerSecond,
                 "Exposure lost per second once the grace period out of the sun has passed.");
+        b = num(b, "ShadeRecoveryMultiplier", (c, v) -> c.shadeRecoveryMultiplier = v, c -> c.shadeRecoveryMultiplier,
+                "Cooling in the shade is this many times ExposureDecayPerSecond (2 = twice as fast as the sun heats).");
         b = num(b, "ExposureGraceSeconds", (c, v) -> c.exposureGraceSeconds = v, c -> c.exposureGraceSeconds,
                 "Continuous seconds out of the sun before exposure starts to decay.");
         b = num(b, "MinSunlightFactor", (c, v) -> c.minSunlightFactor = v, c -> c.minSunlightFactor,
@@ -342,6 +346,7 @@ public class WaterOfArrakisConfig {
     public double getInitialExposure() { return initialExposure; }
     public double getExposureGainPerSecond() { return exposureGainPerSecond; }
     public double getExposureDecayPerSecond() { return exposureDecayPerSecond; }
+    public double getShadeRecoveryMultiplier() { return shadeRecoveryMultiplier; }
     public double getExposureGraceSeconds() { return exposureGraceSeconds; }
     public double getMinSunlightFactor() { return minSunlightFactor; }
     public int getSkyClearBlocks() { return (int) skyClearBlocks; }
