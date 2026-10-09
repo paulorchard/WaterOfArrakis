@@ -32,6 +32,23 @@ public class WaterOfArrakisConfig {
     private double minSunlightFactor = 0.25;
     /** Blocks above the head that must be free of solid blocks for the player to count as in direct sun. */
     private double skyClearBlocks = 0;
+    /**
+     * True: the sun check is a ray from the player toward the sun, so shade follows the sun. False: the old check
+     * (nothing above the head by the height map), kept so the two can be compared.
+     */
+    private boolean useShadeRays = true;
+    /** Blocks a ray toward the sun is followed. Low sun needs long rays; shorter means far mountains do not shade. */
+    private double shadeRayLength = 48;
+    /** Shade added by each semi-transparent solid block (leaves) on a ray. 1.0 in total fully shades it. */
+    private double partialShadeWeight = 0.5;
+    /** Below this sun fraction the player counts as in shade (the grace timer runs). */
+    private double shadeThreshold = 0.5;
+    /** How many times a second a player's sun check is made. The simulation uses the last result in between. */
+    private double shadeChecksPerSecond = 4;
+    /** Heights above the feet of the three sample points: head, chest, legs. */
+    private double[] sunSampleHeights = {1.6, 1.0, 0.3};
+    /** The sun fraction is smoothed over about this many seconds so a shadow edge does not make it flicker. */
+    private double sunSmoothingSeconds = 0.5;
 
     // ------------------------------------------------------------------ water drain
     private double waterDrainBasePerSecond = 0.02;
@@ -143,7 +160,24 @@ public class WaterOfArrakisConfig {
         b = num(b, "MinSunlightFactor", (c, v) -> c.minSunlightFactor = v, c -> c.minSunlightFactor,
                 "The sun counts as up when the world sunlight factor (0 night to 1 midday) is at least this.");
         b = num(b, "SkyClearBlocks", (c, v) -> c.skyClearBlocks = v, c -> c.skyClearBlocks,
-                "Extra blocks above the head that may be solid and still count as sun. 0 means any solid block above shades.");
+                "Only used when UseShadeRays is false: extra blocks above the head that may be solid and still count as sun.");
+        b = b.append(new KeyedCodec<>("UseShadeRays", Codec.BOOLEAN, false),
+                        (c, v) -> c.useShadeRays = v, c -> c.useShadeRays)
+                .documentation("True: sun is a ray from the player toward the sun, so shade moves with the sun. "
+                        + "False: the old check (nothing above the head), for comparison.")
+                .add();
+        b = num(b, "ShadeRayLength", (c, v) -> c.shadeRayLength = v, c -> c.shadeRayLength,
+                "Blocks each ray toward the sun is followed.");
+        b = num(b, "PartialShadeWeight", (c, v) -> c.partialShadeWeight = v, c -> c.partialShadeWeight,
+                "Shade added by each semi-transparent solid block (leaves) on a ray; 1.0 in total is full shade.");
+        b = num(b, "ShadeThreshold", (c, v) -> c.shadeThreshold = v, c -> c.shadeThreshold,
+                "Below this sun fraction (0..1) the player is in shade and the grace timer runs.");
+        b = num(b, "ShadeChecksPerSecond", (c, v) -> c.shadeChecksPerSecond = v, c -> c.shadeChecksPerSecond,
+                "How many times a second each player's sun check is made.");
+        b = arr(b, "SunSampleHeights", (c, v) -> c.sunSampleHeights = v, c -> c.sunSampleHeights,
+                "Heights above the feet of the sample points (head, chest, legs). Each casts its own ray.");
+        b = num(b, "SunSmoothingSeconds", (c, v) -> c.sunSmoothingSeconds = v, c -> c.sunSmoothingSeconds,
+                "The sun fraction is smoothed over about this long so a shadow edge does not flicker the timer.");
         b = num(b, "WaterDrainBasePerSecond", (c, v) -> c.waterDrainBasePerSecond = v, c -> c.waterDrainBasePerSecond,
                 "Water lost per second doing nothing (0.02 = about 83 minutes from full to empty).");
         b = num(b, "WaterDrainRunPerSecond", (c, v) -> c.waterDrainRunPerSecond = v, c -> c.waterDrainRunPerSecond,
@@ -311,6 +345,15 @@ public class WaterOfArrakisConfig {
     public double getExposureGraceSeconds() { return exposureGraceSeconds; }
     public double getMinSunlightFactor() { return minSunlightFactor; }
     public int getSkyClearBlocks() { return (int) skyClearBlocks; }
+    public boolean isUseShadeRays() { return useShadeRays; }
+    public double getShadeRayLength() { return shadeRayLength; }
+    public double getPartialShadeWeight() { return partialShadeWeight; }
+    public double getShadeThreshold() { return shadeThreshold; }
+    public double getShadeChecksPerSecond() { return shadeChecksPerSecond; }
+    public double getSunSmoothingSeconds() { return sunSmoothingSeconds; }
+    public double[] getSunSampleHeights() {
+        return sunSampleHeights == null || sunSampleHeights.length == 0 ? new double[] {1.6, 1.0, 0.3} : sunSampleHeights;
+    }
     public double getWaterDrainBasePerSecond() { return waterDrainBasePerSecond; }
     public double getWaterDrainRunPerSecond() { return waterDrainRunPerSecond; }
     public double getWaterDrainClimbPerSecond() { return waterDrainClimbPerSecond; }

@@ -37,6 +37,8 @@ public final class WaterService {
     private final CopyOnWriteArrayList<WaterListener> listeners = new CopyOnWriteArrayList<>();
     /** player -> modifier id -> type -> value. */
     private final Map<UUID, Map<String, Map<ModifierType, Double>>> modifiers = new ConcurrentHashMap<>();
+    /** player -> sun fraction of the last tick. */
+    private final Map<UUID, Double> sunFractions = new ConcurrentHashMap<>();
 
     WaterService(Supplier<WaterOfArrakisConfig> config) {
         this.config = config;
@@ -162,6 +164,38 @@ public final class WaterService {
         return all;
     }
 
+    // ------------------------------------------------------------------ sun
+
+    /**
+     * How sunlit the player was on the last simulation tick, 0 (shade or night) to 1 (full sun), after the sun
+     * intensity modifiers. Read only; 0 for a player not yet simulated. Gain in exposure is proportional to it.
+     */
+    public double getSunFraction(PlayerRef player) {
+        return sunFractions.getOrDefault(player.getUuid(), 0.0);
+    }
+
+    public double getSunFraction(UUID player) {
+        return sunFractions.getOrDefault(player, 0.0);
+    }
+
+    /**
+     * Dims the sun for every player in a world: for example the storm mod sets 0.2 while a Coriolis storm blows and
+     * removes it afterwards. Same id rules as {@link #setModifier}: the id is yours, the value replaces your last one.
+     *
+     * @param worldId the world's UUID ({@code world.getWorldConfig().getUuid()})
+     */
+    public void setWorldSunIntensity(UUID worldId, String id, double multiplier) {
+        setModifier(worldId, id, ModifierType.SUN_INTENSITY_MULTIPLIER, multiplier);
+    }
+
+    public void removeWorldSunIntensity(UUID worldId, String id) {
+        removeModifier(worldId, id, ModifierType.SUN_INTENSITY_MULTIPLIER);
+    }
+
+    void setSunFraction(UUID player, double fraction) {
+        sunFractions.put(player, fraction);
+    }
+
     // ------------------------------------------------------------------ listeners
 
     public void addListener(WaterListener listener) {
@@ -176,6 +210,7 @@ public final class WaterService {
 
     void forget(UUID player) {
         modifiers.remove(player);
+        sunFractions.remove(player);
     }
 
     int exposureStep(double exposure) {

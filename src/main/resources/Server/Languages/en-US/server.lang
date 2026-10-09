@@ -30,3 +30,4 @@ waterOfArrakis.bushDepleted = You have already dug up a bulb here today.
 waterOfArrakis.bushBulb = You dig up a Burrow Bulb.
 waterOfArrakis.bagFull = Your bag is full.
 commands.waterplants.desc = Place primroses and burrowbushes on island rock in the loaded chunks around you: waterplants [radiusInChunks]
+commands.sunprobe.desc = Debug the sun check: sunprobe [ray] shows what blocks each sample ray; sunprobe time shows the sun direction; sunprobe blocks [ids] shows what blocks report

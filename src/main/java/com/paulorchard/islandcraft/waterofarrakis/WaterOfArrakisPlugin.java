@@ -84,6 +84,7 @@ public class WaterOfArrakisPlugin extends JavaPlugin {
                 (s, p, v) -> s.setExposure(p, v), (s, p, v) -> s.addExposure(p, v)));
         getCommandRegistry().registerCommand(WaterCommands.debug(service, system, () -> config.get()));
         getCommandRegistry().registerCommand(WaterCommands.plants(() -> config.get()));
+        getCommandRegistry().registerCommand(SunProbeCommand.build(() -> config.get()));
 
         getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, event -> system.forget(event.getPlayerRef().getUuid()));
     }

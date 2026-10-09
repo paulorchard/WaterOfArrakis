@@ -22,12 +22,47 @@ Status key: *verified* = read from the 0.6.8 jar or assets, or run on the headle
 - **Colour:** the client `ProgressBar` has no colour property (colour comes from its texture), so each fill is a plain coloured `Group` whose `Anchor.Width` is set from the value and whose `Background` is set to a hex colour. That is how the orange to red blend is done. The property paths `#X.Anchor` and `#X.Background` are the likely form but *in game: not yet seen*. If the Background string is refused, the fallback is a few pre-coloured texture steps.
 - Icons are generated 48 px placeholder PNGs (`Arrakis_Water_Icon.png`, `Arrakis_Sun_Icon.png`); replace the files and keep the names.
 
-### Sunlight
+### Sunlight (rewritten: shade rays toward the sun)
 
-- `WorldTimeResource.getSunlightFactor()` (0 night, 1 midday), `getSunDirection()`, `getDayProgress()`, `isDayTimeWithinRange()` exist. *verified*
-- Stored sky light (`BlockSection.getGlobalLight().getSkyLight`, 0..15) is the per-block exposure to the sky; it does not change with time of day, and a section has none until lit. Not used.
-- Used: sun is up (`getSunlightFactor() >= MinSunlightFactor`) AND the head is above the chunk height map (`WorldChunk.getHeight`, the y of the top block of the column). One lookup, no raycast. Leaves and any solid roof shade; a column that is not loaded counts as shade. *Whether the height map counts grass and flowers as cover is not verified*; if it does, standing in grass would read as shade (fix: raycast up and ignore non-`Solid` blocks).
-- Weather and clouds: the server exposes no cloud coverage. Not considered.
+Superseded the first version (sun up AND nothing above the head by the height map), which ignored the sun's direction. It is still available with `UseShadeRays` false.
+
+**Answers to the three unknowns** (measured on the headless server with `/time set <hour>` then `/sunprobe time`, which prints the raw value; *verified*, but not compared with the sun in game):
+
+| Clock | Sunlight factor | `getSunDirection()` raw | Ray toward the sun | Elevation |
+| ----- | --------------- | ----------------------- | ------------------ | --------- |
+| 4.0 | 0.00 | 0.560 -0.645 -0.147 | -0.647 0.744 0.170 | 48 (night: the vector is the moon's) |
+| 5.0 | 0.254 | -0.647 -0.409 -0.029 | 0.845 0.534 0.038 | 32 |
+| 5.5 | 0.385 | -0.614 -0.541 -0.095 | 0.745 0.657 0.116 | 41 |
+| 6.0 | 0.511 | -0.557 -0.650 -0.150 | 0.641 0.748 0.173 | 48 |
+| 7.0 | 0.747 | -0.422 -0.792 -0.221 | 0.457 0.857 0.239 | 59 |
+| 9.0 | 1.000 | -0.210 -0.900 -0.275 | 0.218 0.933 0.285 | 69 |
+| 12.0 | 1.000 | 0.001 -0.931 -0.291 | -0.001 0.955 0.298 | 73 |
+| 15.0 | 0.652 | 0.211 -0.900 -0.275 | -0.219 0.933 0.285 | 69 |
+| 17.0 | 0.146 | 0.425 -0.790 -0.220 | -0.460 0.855 0.238 | 59 |
+| 18.0 | 0.000 | 0.559 -0.647 -0.149 | -0.644 0.746 0.171 | 48 (night) |
+
+1. **From or to?** The server's vector is the direction the light **travels**: it points down (y about -0.65 to -0.93) all day. The bytecode negates it when `y + 0.2 > 0` and then bends it toward straight down by 0.35. `SunShade.towardSun` flips it so y is positive and normalises it. **It is not normalised** (length 0.76 to 0.98), so the mod normalises it.
+2. **East.** In the morning (clock 5 to 9) the ray toward the sun has x > 0: the sun is on the +X side at sunrise and on the -X side in the afternoon. East is +X, as the earlier logs said. At noon the ray leans toward +Z (z = +0.30), so the sun is toward the south (north is -Z). Not compared with the in-game compass or a sunrise.
+3. **Elevation at the edges of the day.** The factor passes 0.25 at about clock 5.0 (elevation 32 degrees) and at about clock 16.3 (about 62 degrees; the factor reaches 0 at clock 18). The engine's 0.35 bend toward straight down makes the sun steeper than a real one: even at the first light it is above 30 degrees, so mornings cast the longest shadows (a 6-block wall shadows about 9 blocks) and evenings short ones (about 3 blocks). A `ShadeRayLength` of 48 is far more than needed; 24 would do.
+
+**What blocks report** (`/sunprobe blocks`, 0.6.8, *verified*; fluids are not blocks and never appear):
+
+| Block | Material | Opacity | Draw | A ray treats it as |
+| ----- | -------- | ------- | ---- | ------------------ |
+| Rock_Sandstone_Red, Soil_Sand, Soil_Grass, Wood_Oak_Trunk, Rock_Ice | Solid | Solid | Cube | SOLID (full shade) |
+| Plant_Leaves_Oak | **Empty** | **Cutout** | Model | PARTIAL (leaves shade in part even though they report Material Empty, which is why the material alone cannot decide) |
+| Plant_Grass_Arid, Plant_Grass_Lush, Plant_Flower_Common_Red, Plant_Bush_Arid | Empty | Transparent | Model | OPEN (grass and flowers never shade: the old open question is closed) |
+| Plant_Cactus_1 | Solid | Transparent | Model | OPEN |
+| Furniture_Crude_Window, Furniture_Ancient_Window, Furniture_Cybercity_Windows_Full | Solid | Transparent | Model | OPEN (windows let the sun through) |
+| Furniture_Crude_Torch, Arrakis_Litrejon | Empty | Transparent | Model | OPEN |
+
+Rule (`SunShade.classify`): Opacity Solid shades fully, Cutout shades `PartialShadeWeight`, Semitransparent shades partly only if the material is Solid, Transparent never. Unit tested against these combinations.
+
+**Method.** Three sample points (feet + 1.6, 1.0, 0.3 by default, scaled by the model's eye height over 1.6 when it can be read, so a different pose samples lower) each follow a ray toward the sun for `ShadeRayLength` blocks with `BlockIterator.iterate` (the walk stops when the callback returns false; tested). Solid stops it with full shade, partial blocks add `PartialShadeWeight` until 1, the block the point is in is skipped, a chunk that is not loaded ends the ray as open sky, and so does the top of the world. Sun fraction = average of the three x the sunlight factor, 0 below `MinSunlightFactor`. The stored sky light is not used (it is shown in `/sunprobe` for comparison only). Weather: no cloud data on the server; other mods dim the sun with the `SUN_INTENSITY_MULTIPLIER` modifier (per player, or per world with `WaterService.setWorldSunIntensity`).
+
+**Exposure rules** (`WaterSystem`). The check runs `ShadeChecksPerSecond` (4) times a second per player and the result is smoothed over `SunSmoothingSeconds` (0.5 s). Gain is `ExposureGainPerSecond x sunFraction x gain modifiers` (so full sun is still +1.0/s and the gain has no step at the shade threshold). The player counts as in shade while the fraction is below `ShadeThreshold` (0.5); after `ExposureGraceSeconds` (5 s) of continuous shade exposure falls at `ExposureDecayPerSecond` and nothing is gained. In shade before the grace is over the small gain (fraction below 0.5) continues. The one step in the rate is when the grace ends (a small gain becomes the full decay): that is the grace period, not a threshold artefact.
+
+**Cost.** Measured in a unit test on a fake block grid, JIT warmed: **1.5 microseconds per 3-ray check** (48-block rays at 40 degrees, one leaf in the way). The real world adds a chunk lookup each time a ray crosses a chunk boundary (at most 2 to 3 per ray) and one cached block-class lookup per block, so expect a few times that; at 4 checks a second per player that is well under 0.1 ms per second per player. **Not measured in the real server**; there is no player in the headless run.
 
 ### Stamina: how costs and regeneration are applied
 
@@ -81,3 +116,15 @@ HP numbers against vanilla: Egg 5, Kebab 10 (+ slow regen), Bread 15, so Spicebr
 ### Test in game
 
 `/give <you> Arrakis_Litrejon` (and the other three ids). Litrejon: right-click hold with a not-full flask while looking at water fills it; otherwise it drinks 50 (`/water set 60` first). Check the durability bar and a second drink at 100 water ("not thirsty"). Foods: `/water set 50`, `/damage` yourself, eat each, `/waterdebug`.
+
+## Shade rays: what to check in game (NOT seen in game; everything above the cost line is from the jar, the headless server and unit tests)
+
+Commands: `/time <hour>` sets the clock; `/waterdebug` shows the sun fraction, sample points, shade timer and the exposure rate; `/sunprobe` lists what blocks each of the three rays (or "open"); `/sunprobe ray` also puffs particles along the rays for 5 s (dust = head, sand = chest, hard dust = legs, dirt = the blocking block); `/sunprobe time` and `/sunprobe blocks [ids]` also work from the console.
+
+1. `/time 12`, stand in the open: sun fraction about 1.00, exposure +1.0 per second. Step under a one-block overhang: the fraction drops to 0, and 5 s later exposure starts to fall.
+2. `/time 7` and `/time 17`, stand just behind a tall rock, wall or island cliff: the shadow side is shade, the sunny side is full sun, and the shaded spot moves between 7 and 17 (the shadow lies to the west in the morning and the east in the afternoon). Compare with the shadows you can see: if they disagree the direction or the sign is wrong (`/sunprobe time`, `/sunprobe ray`).
+3. Walk from a cave mouth inward; stand under one leaf block (about 0.5); stand in tall grass (must stay 1.0).
+4. Walk back and forth across a shadow edge: the "in shade for N s" counter in `/waterdebug` must not keep resetting from flicker.
+5. Set `UseShadeRays` false in `Water_of_Arrakis.json` and compare: the old behaviour (a roof is the only shade, 1 or 0).
+6. With several players, watch the tick time; each check should be well under a millisecond.
+7. Check the particles from `/sunprobe ray` actually line up with the sun. Particle ids are guesses (`Block_Break_Dust`, `Block_Break_Sand`, `Block_Land_Hard_Dust`, `Block_Break_Dirt`); if one does not exist nothing is drawn for it.

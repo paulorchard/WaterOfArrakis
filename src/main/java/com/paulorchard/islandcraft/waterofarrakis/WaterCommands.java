@@ -93,11 +93,28 @@ final class WaterCommands {
                     cfg.exposureDrainMultiplier(exposure), mods.get(ModifierType.EXPOSURE_GAIN_MULTIPLIER),
                     mods.get(ModifierType.EXPOSURE_DECAY_MULTIPLIER), mods.get(ModifierType.WATER_DRAIN_MULTIPLIER),
                     mods.get(ModifierType.WATER_ACTION_DRAIN_MULTIPLIER), mods.get(ModifierType.EXPOSURE_OFFSET)));
+            double rate = system.exposureRate(target.getUuid());
+            double shadeSeconds = system.secondsOutOfSun(target.getUuid());
+            SunProbe probe = system.probeOf(target.getUuid());
             say(ctx, String.format(Locale.ROOT,
-                    "in direct sun: %s (sun up: %s, open sky: %s), %.1f s out of the sun, stamina %.2f",
-                    yes(system.isInSun(target.getUuid())), yes(SunProbe.sunIsUp(store, cfg)),
-                    yes(ref != null && SunProbe.open(world(store), store, ref, cfg)),
-                    system.secondsOutOfSun(target.getUuid()), stamina));
+                    "sun fraction %.2f (threshold %.2f, UseShadeRays %s): %s; stamina %.2f",
+                    service.getSunFraction(target), cfg.getShadeThreshold(), cfg.isUseShadeRays(),
+                    shadeSeconds <= 0 ? "in the sun" : String.format(Locale.ROOT, "in shade for %.1f s (grace %.1f s)",
+                            shadeSeconds, cfg.getExposureGraceSeconds()), stamina));
+            say(ctx, String.format(Locale.ROOT, "exposure rate now %+.3f per second (%s); sun-intensity modifier x%.2f",
+                    rate, rate < 0 ? "cooling" : "heating",
+                    mods.get(ModifierType.SUN_INTENSITY_MULTIPLIER)));
+            if (probe != null) {
+                say(ctx, String.format(Locale.ROOT,
+                        "sunlight factor %.2f; sun direction raw %.2f %.2f %.2f, toward the sun %.2f %.2f %.2f",
+                        probe.sunlightFactor, probe.rawDirection.x, probe.rawDirection.y, probe.rawDirection.z,
+                        probe.rayDirection.x, probe.rayDirection.y, probe.rayDirection.z));
+                StringBuilder samples = new StringBuilder("sample points (head, chest, legs):");
+                for (double s : probe.samples) {
+                    samples.append(String.format(Locale.ROOT, " %.2f", s));
+                }
+                say(ctx, samples.toString());
+            }
         }, "player");
     }
 

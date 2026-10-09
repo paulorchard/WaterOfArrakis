@@ -13,6 +13,12 @@ public enum ModifierType {
     WATER_DRAIN_MULTIPLIER(1.0),
     /** Multiplies the water drain of actions (running, climbing, jumping). Default 1. */
     WATER_ACTION_DRAIN_MULTIPLIER(1.0),
+    /**
+     * Multiplies how sunlit the player is (the sun fraction, 0..1) before exposure is gained. 0.3 under storm
+     * clouds, 0 for a full cover. Set it for one player, or for a whole world with
+     * {@link WaterService#setWorldSunIntensity}. Default 1.
+     */
+    SUN_INTENSITY_MULTIPLIER(1.0),
     /** Flat exposure change in percent per second, added after gain and decay. Negative cools. Default 0. */
     EXPOSURE_OFFSET(0.0);
 
