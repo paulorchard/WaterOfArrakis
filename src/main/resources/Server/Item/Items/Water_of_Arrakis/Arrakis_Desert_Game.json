@@ -1,0 +1,39 @@
+{
+  "$Comment": "Placeholder model: Meat Skewer. Effects run in code (Arrakis_Consume), numbers are in Water_of_Arrakis.json.",
+  "Parent": "Template_Food",
+  "TranslationProperties": {
+    "Name": "server.items.Arrakis_Desert_Game.name",
+    "Description": "server.items.Arrakis_Desert_Game.description"
+  },
+  "Quality": "Uncommon",
+  "Icon": "Icons/ItemsGenerated/Food_Skewer_Meat.png",
+  "BlockType": {
+    "Material": "Empty",
+    "DrawType": "Model",
+    "CustomModel": "Items/Consumables/Food/Meat_Skewer.blockymodel",
+    "CustomModelTexture": [
+      {
+        "Texture": "Items/Consumables/Food/Meat_Skewer_Texture.png",
+        "Weight": 1
+      }
+    ],
+    "HitboxType": "Food_Medium",
+    "CustomModelScale": 1,
+    "ParticleColor": "#f2de88",
+    "TextureComputedColor": "#613F1C"
+  },
+  "Scale": 1.2,
+  "InteractionVars": {
+    "Effect": {
+      "Interactions": [
+        {
+          "Type": "Arrakis_Consume",
+          "Item": "Arrakis_Desert_Game"
+        }
+      ]
+    }
+  },
+  "ItemLevel": 5,
+  "MaxStack": 25,
+  "DropOnDeath": true
+}

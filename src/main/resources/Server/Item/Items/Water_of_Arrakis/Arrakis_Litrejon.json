@@ -1,0 +1,35 @@
+{
+  "$Comment": "Reusable water flask. Placeholder: the Energy Potion (Potion_Signature) model and icon. The water amount is saved on the stack (metadata Arrakis_Water_Units) and mirrored to durability, max 500.",
+  "Parent": "Potion_Template",
+  "TranslationProperties": {
+    "Name": "server.items.Arrakis_Litrejon.name",
+    "Description": "server.items.Arrakis_Litrejon.description"
+  },
+  "Quality": "Uncommon",
+  "Icon": "Icons/ItemsGenerated/Potion_Signature.png",
+  "IconProperties": {
+    "Scale": 0.9,
+    "Rotation": [22.5, 45, 22.5],
+    "Translation": [0, -9]
+  },
+  "Interactions": {
+    "Primary": "Block_Primary",
+    "Secondary": "Arrakis_Root_Flask"
+  },
+  "BlockType": {
+    "CustomModel": "Items/Consumables/Potions/Potion_Normal.blockymodel",
+    "CustomModelTexture": [
+      {
+        "Texture": "Items/Consumables/Potions/Potion_Textures/Cyan.png",
+        "Weight": 1
+      }
+    ],
+    "BlockParticleSetId": "GlassMagic",
+    "ParticleColor": "#4efaff",
+    "TextureComputedColor": "#9BCDCF"
+  },
+  "Consumable": false,
+  "MaxDurability": 500,
+  "MaxStack": 1,
+  "DropOnDeath": true
+}

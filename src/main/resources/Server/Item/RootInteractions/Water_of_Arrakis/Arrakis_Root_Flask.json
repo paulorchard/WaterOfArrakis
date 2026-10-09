@@ -1,0 +1,6 @@
+{
+  "RequireNewClick": true,
+  "Interactions": [
+    "Arrakis_Condition_Flask"
+  ]
+}

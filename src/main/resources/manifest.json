@@ -1,0 +1,21 @@
+{
+  "Group": "IslandCraft",
+  "Name": "IslandCraft - Water of Arrakis",
+  "Version": "0.1.0",
+  "Description": "Water and sun exposure on Arrakis. Water is scarce; the sun is not.",
+  "Authors": [
+    {
+      "Name": "paulo"
+    }
+  ],
+  "ServerVersion": "*",
+  "Main": "com.paulorchard.islandcraft.waterofarrakis.WaterOfArrakisPlugin",
+  "Dependencies": {
+    "Hytale:EntityModule": "*"
+  },
+  "OptionalDependencies": {
+    "IslandCraft:IslandCraft - Dunes of Arrakis": "*"
+  },
+  "DisabledByDefault": false,
+  "IncludesAssetPack": true
+}

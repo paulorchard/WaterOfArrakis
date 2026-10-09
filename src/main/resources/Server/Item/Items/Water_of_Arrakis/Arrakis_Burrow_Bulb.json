@@ -1,0 +1,39 @@
+{
+  "$Comment": "Placeholder model: Egg. Effects run in code (Arrakis_Consume), numbers are in Water_of_Arrakis.json.",
+  "Parent": "Template_Food",
+  "TranslationProperties": {
+    "Name": "server.items.Arrakis_Burrow_Bulb.name",
+    "Description": "server.items.Arrakis_Burrow_Bulb.description"
+  },
+  "Quality": "Common",
+  "Icon": "Icons/ItemsGenerated/Food_Egg.png",
+  "BlockType": {
+    "Material": "Empty",
+    "DrawType": "Model",
+    "CustomModel": "Items/Consumables/Food/Egg.blockymodel",
+    "CustomModelTexture": [
+      {
+        "Texture": "Items/Consumables/Food/Egg_Texture.png",
+        "Weight": 1
+      }
+    ],
+    "HitboxType": "Food_Medium",
+    "CustomModelScale": 0.6,
+    "ParticleColor": "#d97676",
+    "TextureComputedColor": "#B36E3E"
+  },
+  "Scale": 1.2,
+  "InteractionVars": {
+    "Effect": {
+      "Interactions": [
+        {
+          "Type": "Arrakis_Consume",
+          "Item": "Arrakis_Burrow_Bulb"
+        }
+      ]
+    }
+  },
+  "ItemLevel": 5,
+  "MaxStack": 25,
+  "DropOnDeath": true
+}

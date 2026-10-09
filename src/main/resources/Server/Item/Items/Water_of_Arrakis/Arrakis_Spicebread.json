@@ -1,0 +1,39 @@
+{
+  "$Comment": "Placeholder model: Bread Dough. Effects run in code (Arrakis_Consume), numbers are in Water_of_Arrakis.json.",
+  "Parent": "Template_Food",
+  "TranslationProperties": {
+    "Name": "server.items.Arrakis_Spicebread.name",
+    "Description": "server.items.Arrakis_Spicebread.description"
+  },
+  "Quality": "Uncommon",
+  "Icon": "Icons/ItemsGenerated/Food_Dough.png",
+  "BlockType": {
+    "Material": "Empty",
+    "DrawType": "Model",
+    "CustomModel": "Items/Ingredients/Dough.blockymodel",
+    "CustomModelTexture": [
+      {
+        "Texture": "Items/Ingredients/Dough_Texture.png",
+        "Weight": 1
+      }
+    ],
+    "HitboxType": "Food_Medium",
+    "CustomModelScale": 0.5,
+    "ParticleColor": "#f0ebc6",
+    "TextureComputedColor": "#AFA37C"
+  },
+  "Scale": 1.2,
+  "InteractionVars": {
+    "Effect": {
+      "Interactions": [
+        {
+          "Type": "Arrakis_Consume",
+          "Item": "Arrakis_Spicebread"
+        }
+      ]
+    }
+  },
+  "ItemLevel": 5,
+  "MaxStack": 25,
+  "DropOnDeath": true
+}

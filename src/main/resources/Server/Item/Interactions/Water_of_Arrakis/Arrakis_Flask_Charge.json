@@ -1,0 +1,37 @@
+{
+  "Type": "Serial",
+  "Interactions": [
+    {
+      "Type": "Replace",
+      "Var": "ConsumeSFX",
+      "DefaultValue": {
+        "Interactions": [
+          "Consume_SFX"
+        ]
+      }
+    },
+    {
+      "Type": "Charging",
+      "FailOnDamage": true,
+      "Effects": {
+        "ItemAnimationId": "Consume",
+        "ClearAnimationOnFinish": true,
+        "ClearSoundEventOnFinish": true
+      },
+      "HorizontalSpeedMultiplier": 0.4,
+      "Next": {
+        "1.5": {
+          "Type": "Arrakis_Flask",
+          "Next": {
+            "Type": "Simple",
+            "RunTime": 0.2,
+            "$Comment": "Delay before the next use can start, so sounds do not overlap"
+          }
+        }
+      },
+      "Failed": {
+        "Type": "Simple"
+      }
+    }
+  ]
+}

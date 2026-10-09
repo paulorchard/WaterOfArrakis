@@ -1,0 +1,66 @@
+// Water of Arrakis HUD: two bars stacked above the vanilla Health (left) and Stamina (right) bars.
+// Vanilla (Health.ui / StaminaPanel.ui): Bottom = 36 (margin) + 78 (hotbar height) + 6 = 120, Width = 702 (hotbar width), Height = 12.
+// Ours: Bottom = 120 + 12 (bar) + 7 (gap, so the 24 px icons of the upper bars clear the vanilla icons) = 139.
+//
+// Style copied from the vanilla bars (see tools/assets/make_bars.ps1): a dark background with a light rim, the outer
+// end cut on a slant (Health: left, Stamina: right), a gradient fill and a sheen. The fill is a white texture that is
+// tinted with Background.Color; the sheen sits on top and is not tinted. Fill and sheen share one size, set from code.
+// HorizontalBorder keeps the slanted end undistorted while the fill is stretched.
+
+Group #WaterBar {
+  LayoutMode: Bottom;
+  Anchor: (Bottom: 139, Width: 702, Height: 12);
+
+  Group {
+    LayoutMode: Left;
+
+    Group #WaterIcon {
+      Anchor: (Left: 0, Width: 24, Height: 24, Right: 4, Top: -8);
+      Background: "Arrakis_Water_Icon.png";
+    }
+
+    Group {
+      Anchor: (Left: 0, Width: 318, Height: 12);
+      Background: "Arrakis_Bar_Background_Left.png";
+
+      Group #WaterFill {
+        Anchor: (Left: 0, Width: 318, Height: 12);
+        Background: (TexturePath: "Arrakis_Bar_Fill_Left.png", HorizontalBorder: 8, Color: #2f8fe0);
+      }
+
+      Group #WaterSheen {
+        Anchor: (Left: 0, Width: 318, Height: 12);
+        Background: (TexturePath: "Arrakis_Bar_Sheen_Left.png", HorizontalBorder: 8);
+      }
+    }
+  }
+}
+
+Group #ExposureBar {
+  LayoutMode: Bottom;
+  Anchor: (Bottom: 139, Width: 702, Height: 12);
+
+  Group {
+    LayoutMode: Right;
+
+    Group {
+      Anchor: (Height: 12, Width: 318);
+      Background: "Arrakis_Bar_Background_Right.png";
+
+      Group #ExposureFill {
+        Anchor: (Right: 0, Width: 0, Height: 12);
+        Background: (TexturePath: "Arrakis_Bar_Fill_Right.png", HorizontalBorder: 8, Color: #ff8a1f);
+      }
+
+      Group #ExposureSheen {
+        Anchor: (Right: 0, Width: 0, Height: 12);
+        Background: (TexturePath: "Arrakis_Bar_Sheen_Right.png", HorizontalBorder: 8);
+      }
+    }
+
+    Group #ExposureIcon {
+      Anchor: (Width: 24, Height: 24, Left: 4, Top: -10);
+      Background: "Arrakis_Sun_Icon.png";
+    }
+  }
+}
