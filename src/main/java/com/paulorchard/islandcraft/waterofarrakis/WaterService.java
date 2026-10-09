@@ -84,9 +84,25 @@ public final class WaterService {
 
     // ------------------------------------------------------------------ derived values
 
-    /** Water tier of the player now: 0 is best. See {@code WaterTierLowerBounds} in the config for the edges. */
-    public int getWaterTier(PlayerRef player) {
-        return config.get().waterTier(getWater(player));
+    /**
+     * Stamina pause multiplier P now: every regeneration pause lasts this many times longer. 1.0 at full water and no
+     * exposure (vanilla), 8 at 0 water, more with heat; includes the STAMINA_PAUSE_MULTIPLIER modifiers.
+     */
+    public double getStaminaPauseMultiplier(PlayerRef player) {
+        return StaminaCurves.pauseMultiplier(config.get(), getWater(player), getExposure(player))
+                * getModifier(player, ModifierType.STAMINA_PAUSE_MULTIPLIER);
+    }
+
+    /** Stamina regeneration speed now against vanilla (1.0 = vanilla), including STAMINA_REGEN_MULTIPLIER. */
+    public double getStaminaRegenMultiplier(PlayerRef player) {
+        return StaminaCurves.regenMultiplier(config.get(), getWater(player), getExposure(player))
+                * getModifier(player, ModifierType.STAMINA_REGEN_MULTIPLIER);
+    }
+
+    /** Water that each point of regenerated stamina costs now, including the exposure multiplier and the modifiers. */
+    public double getStaminaRegenWaterCost(PlayerRef player) {
+        return StaminaCurves.waterCostPerPoint(config.get(), getExposure(player))
+                * getModifier(player, ModifierType.STAMINA_REGEN_WATER_COST_MULTIPLIER);
     }
 
     /** Exposure step: floor(exposure / ExposureDrainStepPercent). 0 below 10%, 10 at 100% by default. */
@@ -227,13 +243,6 @@ public final class WaterService {
         double now = state.water;
         for (WaterListener l : listeners) {
             l.onWaterChanged(player, old, now);
-        }
-        int oldTier = config.get().waterTier(old);
-        int newTier = config.get().waterTier(now);
-        if (oldTier != newTier) {
-            for (WaterListener l : listeners) {
-                l.onWaterTierChanged(player, oldTier, newTier);
-            }
         }
         return now;
     }

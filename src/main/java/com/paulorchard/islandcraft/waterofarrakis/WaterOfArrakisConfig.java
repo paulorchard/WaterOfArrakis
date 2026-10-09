@@ -62,37 +62,119 @@ public class WaterOfArrakisConfig {
     /** Added to the drain multiplier for each full step of exposure (0.10 gives x1.0 .. x2.0 across 0..100). */
     private double exposureDrainStepBonus = 0.10;
 
-    // ------------------------------------------------------------------ water tiers and stamina
+    // ------------------------------------------------------------------ stamina costs of this mod
     /**
-     * Lower bounds, in percent, of every tier except the last, highest first. A tier INCLUDES its lower bound and
-     * EXCLUDES its upper bound, except tier 0 which includes 100. With {75, 50, 25}: tier 0 is 75..100 (75 itself is
-     * tier 0), tier 1 is 50..75 (50 is tier 1, 75 is not), tier 2 is 25..50, tier 3 is 0..25 (25 is tier 2).
+     * Stamina taken by one jump, in seconds of sprinting: 1.0 is the same as one second of sprint (10% of the stamina
+     * bar, since vanilla sprint drains 1.0 of 10 per second). The sprint rate is read from Stamina.json at startup, so
+     * this follows it if the asset changes. Full price at every water level. Vanilla charges nothing for a jump.
      */
-    private double[] waterTierLowerBounds = {75, 50, 25};
-    /** Multiplier on the stamina cost of running (sprinting), jumping and climbing, one entry per tier. Attacks are never scaled. */
-    private double[] tierActionStaminaCost = {0.0, 0.5, 1.0, 1.0};
-    /** Multiplier on stamina regeneration, one entry per tier. */
-    private double[] tierStaminaRegen = {1.0, 1.0, 1.0, 0.5};
-    /** Stamina taken by one jump at multiplier 1.0. Vanilla 0.6.8 charges nothing for jumping, so 0 keeps vanilla. */
-    private double jumpStaminaCost = 0;
+    private double jumpCostSprintSeconds = 1.0;
+    /** The same for a vault (the ledge pull-up, the engine mantling state). */
+    private double vaultCostSprintSeconds = 1.0;
+    /**
+     * A vault that starts within this many seconds after a jump that was charged is the same action: only the extra
+     * (the vault cost less what the jump already took) is charged, so a jump into a vault costs the higher of the
+     * two, not both.
+     */
+    private double jumpToVaultWindowSeconds = 0.8;
+    /**
+     * True: while stamina is 0 or less a short "cannot jump" movement effect is kept on the player (the engine
+     * disables the jump control; whether it also stops a vault is not known). False (default): jumping at 0 stamina
+     * is allowed and just costs nothing more, because a player at 0 water cannot recover stamina and could be left
+     * stuck in a pit.
+     */
+    private boolean blockJumpAtZeroStamina = false;
+    /**
+     * Base regeneration pauses, in vanilla seconds (the StaminaRegenDelay stat); the stamina rework multiplies every pause
+     * by the pause multiplier P. They are ADDITIONS to vanilla for jump, vault and climbing (vanilla has no pause there).
+     * For sprinting vanilla already pauses 0.75 s when sprinting stops (Plugin.Stamina.SprintRegenDelay); a positive value
+     * here REPLACES that 0.75 with this one (0.5), 0 keeps vanilla. Jump and vault set at least this much (a longer pause
+     * already running is never shortened); climbing holds at least this much while it lasts.
+     */
+    private double sprintEndPauseSeconds = 0.5;
+    private double jumpPauseSeconds = 0.5;
+    private double vaultPauseSeconds = 0.5;
+    private double climbPauseSeconds = 0.5;
     /** Stamina taken per second of climbing at multiplier 1.0. Vanilla 0.6.8 charges nothing for climbing. */
     private double climbStaminaCostPerSecond = 0;
     /**
-     * Stamina regeneration is measured as the rise in stamina between two ticks. A rise faster than this many stamina
-     * per second (a potion, food) is not regeneration and is left alone. Vanilla regenerates 3 per second.
+     * Natural regeneration is told from a restore (potion, food) by its size: vanilla regenerates in steps of one
+     * regenerating amount (0.3, read from Stamina.json), and a tick may hold up to this many steps. A rise that is not a
+     * whole number of steps (within NaturalRegenTolerance) is a restore and is left alone.
      */
-    private double regenDeltaCapPerSecond = 4;
+    private double naturalRegenMaxSteps = 3;
+    private double naturalRegenTolerance = 0.02;
+
+    // ------------------------------------------------------------------ stamina curves (catching your breath)
+    // w = water / 100, e = exposure / 100, dry = 1 - w. Full water and no exposure give exactly 1.0 for both multipliers.
+    /** Pause multiplier P = (1 + PauseDryScale * dry^PauseDryExponent) * (1 + PauseExposureScale * e). */
+    private double pauseDryScale = 7.0;
+    private double pauseDryExponent = 2.0;
+    private double pauseExposureScale = 0.5;
+    /** Regen speed multiplier R = 1 / ((1 + RegenDryScale * dry^RegenDryExponent) * (1 + RegenExposureScale * e)). */
+    private double regenDryScale = 1.5;
+    private double regenDryExponent = 2.0;
+    private double regenExposureScale = 0.25;
+    /** Water taken for each stamina point that comes back by natural regeneration, before the exposure multiplier. */
+    private double regenWaterCostPerPoint = 0.05;
+    /** The longest a regeneration pause may be, in seconds (the minimum of the StaminaRegenDelay stat). */
+    private double maxPauseSeconds = 60.0;
+
+    // ------------------------------------------------------------------ out of water
+    /**
+     * Health damage per unit of water that was due to be drained but could not be, while water AND stamina are both 0.
+     * 5.0 makes the idle bleed 0.1 HP per second (the baseline drain is 0.02 water per second), i.e. 1 HP every 10
+     * seconds in the shade, twice that in full sun (the exposure multiplier still applies), more when running or jumping.
+     */
+    private double zeroWaterHpPerWaterUnit = 5.0;
+    /**
+     * While water and stamina are both 0, an action that costs stamina (sprint, jump, vault, climb) costs this much HP
+     * per point of stamina it could not take: 1.0 is 1 HP for each stamina the action would have cost (one jump, or one
+     * second of sprint, is 1 HP).
+     */
+    private double zeroStaminaHpPerStamina = 1.0;
+    /** The damage is applied at most this often (seconds), so the hurt flash and sound do not repeat many times a second. */
+    private double zeroWaterDamageIntervalSeconds = 1.0;
+    /**
+     * Damage is held in an accumulator and dealt in whole steps of this many HP (fractions carry over). With 1.0 the
+     * idle bleed of 0.02 HP per second becomes one hit of 1 HP about every 50 seconds. 0 deals the accumulated amount
+     * (fractions included) every interval.
+     */
+    private double zeroWaterMinHit = 1.0;
+    /** Movement speed multiplier at 0 water (0.9 = 10% slower; 0.1 = 10% of normal). Snapped to the nearest 5%. */
+    private double zeroWaterSpeedMultiplier = 0.9;
+    /** Water and exposure a player has after respawning. */
+    private double respawnWater = 50;
+    private double respawnExposure = 0;
 
     // ------------------------------------------------------------------ HUD
-    /** Bar width in pixels (the vanilla health and stamina bars are 318). */
-    private double hudBarWidth = 318;
+    /**
+     * How the bar is sized. "percent" (default): the bar starts HudTopPercent of the way down the space above its icon
+     * and ends HudIconGap above the icon, so its length is a true share of the screen height. "margins": it starts
+     * HudTopMargin virtual pixels from the top. "fixed": a bar HudFixedHeight pixels long starting HudTopMargin down.
+     */
+    private String hudMode = "percent";
+    /** Distance of each bar from its screen edge, in virtual pixels. */
+    private double hudEdgeMargin = 18;
+    /** Thickness of each bar (the vanilla bars are 12). */
+    private double hudBarThickness = 12;
+    /** Mode percent: space above the bar as a share of the column (the screen height less the icon strip), in percent. */
+    private double hudTopPercent = 6.5;
+    /** Modes margins and fixed: space above the bar in virtual pixels, and for fixed the bar length. */
+    private double hudTopMargin = 60;
+    private double hudFixedHeight = 624;
+    /** Gap between the bottom of the bar and the top of its icon, in virtual pixels. */
+    private double hudIconGap = 4;
+    /** Icon size and its distance from the bottom of the screen, in virtual pixels. */
+    private double hudIconSize = 24;
+    private double hudIconBottomMargin = 20;
     /** Exposure bar turns from orange to red between this percent and 100. */
     private double exposureRedStartPercent = 75;
     private String exposureColorOrange = "#ff8a1f";
     private String exposureColorRed = "#e0201a";
     private String waterColor = "#2f8fe0";
-    /** Smallest change in bar width (pixels) that is worth sending to the client. */
-    private double hudMinPixelChange = 1;
+    /** Smallest change in a bar (percent of its length) that is worth sending to the client. */
+    private double hudMinPercentChange = 0.25;
 
     // ------------------------------------------------------------------ items
     /** Units of water a Litrejon holds when full. */
@@ -194,23 +276,73 @@ public class WaterOfArrakisConfig {
                 "Exposure is cut into steps of this many percent for the drain multiplier.");
         b = num(b, "ExposureDrainStepBonus", (c, v) -> c.exposureDrainStepBonus = v, c -> c.exposureDrainStepBonus,
                 "Added to the water drain multiplier for each full exposure step (0.10 gives x1.0 at <10% up to x2.0 at 100%).");
-        b = arr(b, "WaterTierLowerBounds", (c, v) -> c.waterTierLowerBounds = v, c -> c.waterTierLowerBounds,
-                "Lower bounds in percent of every water tier but the last, highest first. A tier includes its lower "
-                        + "bound and excludes its upper bound (tier 0 also includes 100).");
-        b = arr(b, "TierActionStaminaCost", (c, v) -> c.tierActionStaminaCost = v, c -> c.tierActionStaminaCost,
-                "Stamina cost multiplier for running, jumping and climbing, one entry per tier (bounds count plus one). "
-                        + "Attacks are never changed.");
-        b = arr(b, "TierStaminaRegen", (c, v) -> c.tierStaminaRegen = v, c -> c.tierStaminaRegen,
-                "Stamina regeneration multiplier, one entry per tier.");
-        b = num(b, "JumpStaminaCost", (c, v) -> c.jumpStaminaCost = v, c -> c.jumpStaminaCost,
-                "Stamina taken by one jump at multiplier 1. Vanilla charges none, so 0 keeps vanilla.");
+        b = num(b, "JumpCostSprintSeconds", (c, v) -> c.jumpCostSprintSeconds = v, c -> c.jumpCostSprintSeconds,
+                "Stamina one jump costs, in seconds of sprinting (1.0 = the same as one second of sprint, 10% of the bar). The sprint rate is read from Stamina.json at startup.");
+        b = num(b, "VaultCostSprintSeconds", (c, v) -> c.vaultCostSprintSeconds = v, c -> c.vaultCostSprintSeconds,
+                "Stamina one vault (ledge pull-up) costs, in seconds of sprinting.");
+        b = num(b, "JumpToVaultWindowSeconds", (c, v) -> c.jumpToVaultWindowSeconds = v, c -> c.jumpToVaultWindowSeconds,
+                "A vault this soon after a charged jump is the same action: only the extra cost is charged, not both.");
+        b = num(b, "SprintEndPauseSeconds", (c, v) -> c.sprintEndPauseSeconds = v, c -> c.sprintEndPauseSeconds,
+                "Pause after sprinting stops, in vanilla seconds. Vanilla is 0.75 (set by the game); a positive value replaces it. 0 keeps vanilla.");
+        b = num(b, "JumpPauseSeconds", (c, v) -> c.jumpPauseSeconds = v, c -> c.jumpPauseSeconds,
+                "Regeneration pause after a jump (an addition to vanilla, which has none). 0 = none.");
+        b = num(b, "VaultPauseSeconds", (c, v) -> c.vaultPauseSeconds = v, c -> c.vaultPauseSeconds,
+                "Regeneration pause after a vault (an addition to vanilla). 0 = none.");
+        b = num(b, "ClimbPauseSeconds", (c, v) -> c.climbPauseSeconds = v, c -> c.climbPauseSeconds,
+                "Regeneration pause held while climbing and after it stops (an addition to vanilla). 0 = none.");
+        b = b.append(new KeyedCodec<>("BlockJumpAtZeroStamina", Codec.BOOLEAN, false),
+                        (c, v) -> c.blockJumpAtZeroStamina = v, c -> c.blockJumpAtZeroStamina)
+                .documentation("Keep a cannot-jump effect on the player while stamina is 0 or less. Off by default: at 0 water stamina cannot recover and a player could be stuck in a pit.")
+                .add();
         b = num(b, "ClimbStaminaCostPerSecond", (c, v) -> c.climbStaminaCostPerSecond = v,
                 c -> c.climbStaminaCostPerSecond,
                 "Stamina taken per second of climbing at multiplier 1. Vanilla charges none, so 0 keeps vanilla.");
-        b = num(b, "RegenDeltaCapPerSecond", (c, v) -> c.regenDeltaCapPerSecond = v, c -> c.regenDeltaCapPerSecond,
-                "A stamina rise faster than this per second is an item, not regeneration, and is never halved.");
-        b = num(b, "HudBarWidth", (c, v) -> c.hudBarWidth = v, c -> c.hudBarWidth,
-                "Width in pixels of the water and exposure bars (vanilla health and stamina bars are 318).");
+        b = num(b, "NaturalRegenMaxSteps", (c, v) -> c.naturalRegenMaxSteps = v, c -> c.naturalRegenMaxSteps,
+                "A stamina rise of 1 to this many regeneration steps (0.3 each) on one tick is natural regeneration; any other rise is a restore.");
+        b = num(b, "NaturalRegenTolerance", (c, v) -> c.naturalRegenTolerance = v, c -> c.naturalRegenTolerance,
+                "How close a rise must be to a whole number of steps to count as natural regeneration.");
+        b = num(b, "PauseDryScale", (c, v) -> c.pauseDryScale = v, c -> c.pauseDryScale,
+                "Pause multiplier P = (1 + PauseDryScale * dry^PauseDryExponent) * (1 + PauseExposureScale * exposure), dry = 1 - water. 1.0 at full water and no exposure.");
+        b = num(b, "PauseDryExponent", (c, v) -> c.pauseDryExponent = v, c -> c.pauseDryExponent, "See PauseDryScale.");
+        b = num(b, "PauseExposureScale", (c, v) -> c.pauseExposureScale = v, c -> c.pauseExposureScale, "See PauseDryScale.");
+        b = num(b, "RegenDryScale", (c, v) -> c.regenDryScale = v, c -> c.regenDryScale,
+                "Regen speed R = 1 / ((1 + RegenDryScale * dry^RegenDryExponent) * (1 + RegenExposureScale * exposure)). 1.0 at full water and no exposure.");
+        b = num(b, "RegenDryExponent", (c, v) -> c.regenDryExponent = v, c -> c.regenDryExponent, "See RegenDryScale.");
+        b = num(b, "RegenExposureScale", (c, v) -> c.regenExposureScale = v, c -> c.regenExposureScale, "See RegenDryScale.");
+        b = num(b, "RegenWaterCostPerPoint", (c, v) -> c.regenWaterCostPerPoint = v, c -> c.regenWaterCostPerPoint,
+                "Water each stamina point of natural regeneration costs, times the exposure drain multiplier (x1.0 to x2.0).");
+        b = num(b, "MaxPauseSeconds", (c, v) -> c.maxPauseSeconds = v, c -> c.maxPauseSeconds,
+                "The longest regeneration pause in seconds (the StaminaRegenDelay stat goes down to -60).");
+        b = num(b, "ZeroWaterHpPerWaterUnit", (c, v) -> c.zeroWaterHpPerWaterUnit = v, c -> c.zeroWaterHpPerWaterUnit,
+                "HP of damage per unit of water that could not be drained while water and stamina are both 0 (5 gives 1 HP per 10 s idle in the shade).");
+        b = num(b, "ZeroStaminaHpPerStamina", (c, v) -> c.zeroStaminaHpPerStamina = v, c -> c.zeroStaminaHpPerStamina,
+                "While water and stamina are both 0, stamina an action could not take is taken as this much HP per point (1 = 1 HP per jump, 1 HP per second of sprint).");
+        b = num(b, "ZeroWaterDamageIntervalSeconds", (c, v) -> c.zeroWaterDamageIntervalSeconds = v, c -> c.zeroWaterDamageIntervalSeconds,
+                "The thirst damage is dealt at most this often, in seconds.");
+        b = num(b, "ZeroWaterMinHit", (c, v) -> c.zeroWaterMinHit = v, c -> c.zeroWaterMinHit,
+                "Thirst damage is dealt in whole steps of this many HP; the rest carries over. 0 deals the accumulated amount every interval.");
+        b = num(b, "ZeroWaterSpeedMultiplier", (c, v) -> c.zeroWaterSpeedMultiplier = v, c -> c.zeroWaterSpeedMultiplier,
+                "Movement speed at 0 water: 0.9 is 10% slower, 0.1 is 10% of normal. Snapped to the nearest 5%.");
+        b = num(b, "RespawnWater", (c, v) -> c.respawnWater = v, c -> c.respawnWater, "Water after respawning.");
+        b = num(b, "RespawnExposure", (c, v) -> c.respawnExposure = v, c -> c.respawnExposure, "Exposure after respawning.");
+        b = str(b, "HudMode", (c, v) -> c.hudMode = v, c -> c.hudMode,
+                "percent: bar starts HudTopPercent down and ends HudIconGap above its icon. margins: starts HudTopMargin pixels down. fixed: HudFixedHeight pixels long.");
+        b = num(b, "HudEdgeMargin", (c, v) -> c.hudEdgeMargin = v, c -> c.hudEdgeMargin,
+                "Distance of each bar from its screen edge, in virtual pixels.");
+        b = num(b, "HudBarThickness", (c, v) -> c.hudBarThickness = v, c -> c.hudBarThickness,
+                "Thickness of each bar in virtual pixels (the vanilla bars are 12).");
+        b = num(b, "HudTopPercent", (c, v) -> c.hudTopPercent = v, c -> c.hudTopPercent,
+                "Mode percent: space above the bar as a percent of the column (screen height less the icon strip). 6.5 puts the top of the bar about 6% down the screen.");
+        b = num(b, "HudTopMargin", (c, v) -> c.hudTopMargin = v, c -> c.hudTopMargin,
+                "Modes margins and fixed: space above the bar in virtual pixels.");
+        b = num(b, "HudIconGap", (c, v) -> c.hudIconGap = v, c -> c.hudIconGap,
+                "Gap in virtual pixels between the bottom of the bar and the top of its icon.");
+        b = num(b, "HudFixedHeight", (c, v) -> c.hudFixedHeight = v, c -> c.hudFixedHeight,
+                "Mode fixed: bar length in virtual pixels (624 is 60% of a 1040 pixel screen).");
+        b = num(b, "HudIconSize", (c, v) -> c.hudIconSize = v, c -> c.hudIconSize,
+                "Size of the water and sun icons in virtual pixels.");
+        b = num(b, "HudIconBottomMargin", (c, v) -> c.hudIconBottomMargin = v, c -> c.hudIconBottomMargin,
+                "Distance of the icons from the bottom of the screen in virtual pixels.");
         b = num(b, "ExposureRedStartPercent", (c, v) -> c.exposureRedStartPercent = v, c -> c.exposureRedStartPercent,
                 "The exposure bar is orange up to here and blends to red at 100.");
         b = str(b, "ExposureColorOrange", (c, v) -> c.exposureColorOrange = v, c -> c.exposureColorOrange,
@@ -218,8 +350,8 @@ public class WaterOfArrakisConfig {
         b = str(b, "ExposureColorRed", (c, v) -> c.exposureColorRed = v, c -> c.exposureColorRed,
                 "Exposure bar colour at 100%.");
         b = str(b, "WaterColor", (c, v) -> c.waterColor = v, c -> c.waterColor, "Water bar colour.");
-        b = num(b, "HudMinPixelChange", (c, v) -> c.hudMinPixelChange = v, c -> c.hudMinPixelChange,
-                "A bar is only re-sent to the client when it changes by at least this many pixels.");
+        b = num(b, "HudMinPercentChange", (c, v) -> c.hudMinPercentChange = v, c -> c.hudMinPercentChange,
+                "A bar is only re-sent to the client when it changes by at least this many percent of its length.");
         b = num(b, "LitrejonCapacity", (c, v) -> c.litrejonCapacity = v, c -> c.litrejonCapacity,
                 "Units of water a full Litrejon holds.");
         b = num(b, "LitrejonDrinkAmount", (c, v) -> c.litrejonDrinkAmount = v, c -> c.litrejonDrinkAmount,
@@ -302,42 +434,11 @@ public class WaterOfArrakisConfig {
 
     // ------------------------------------------------------------------ derived rules
 
-    /**
-     * The water tier of a water value. 0 is the best (full) tier. A tier includes its lower bound and excludes its
-     * upper bound: with bounds {75, 50, 25}, 75.0 is tier 0, 74.99 is tier 1, 50.0 is tier 1, 25.0 is tier 2.
-     */
-    public int waterTier(double water) {
-        for (int i = 0; i < waterTierLowerBounds.length; i++) {
-            if (water >= waterTierLowerBounds[i]) {
-                return i;
-            }
-        }
-        return waterTierLowerBounds.length;
-    }
-
-    public int waterTierCount() {
-        return waterTierLowerBounds.length + 1;
-    }
 
     /** Multiplier applied to water drain at this exposure: 1 + floor(exposure / step) * bonus. */
     public double exposureDrainMultiplier(double exposure) {
         double step = Math.max(1e-6, exposureDrainStepPercent);
         return 1.0 + Math.floor(exposure / step) * exposureDrainStepBonus;
-    }
-
-    public double actionStaminaCost(int tier) {
-        return at(tierActionStaminaCost, tier, 1.0);
-    }
-
-    public double staminaRegen(int tier) {
-        return at(tierStaminaRegen, tier, 1.0);
-    }
-
-    private static double at(double[] values, int index, double fallback) {
-        if (values == null || values.length == 0) {
-            return fallback;
-        }
-        return values[Math.min(Math.max(index, 0), values.length - 1)];
     }
 
     // ------------------------------------------------------------------ getters
@@ -364,15 +465,46 @@ public class WaterOfArrakisConfig {
     public double getWaterDrainClimbPerSecond() { return waterDrainClimbPerSecond; }
     public double getWaterDrainPerJump() { return waterDrainPerJump; }
     public double getExposureDrainStepPercent() { return exposureDrainStepPercent; }
-    public double getJumpStaminaCost() { return jumpStaminaCost; }
+    public double getJumpCostSprintSeconds() { return jumpCostSprintSeconds; }
+    public double getVaultCostSprintSeconds() { return vaultCostSprintSeconds; }
+    public double getJumpToVaultWindowSeconds() { return jumpToVaultWindowSeconds; }
+    public double getSprintEndPauseSeconds() { return sprintEndPauseSeconds; }
+    public double getJumpPauseSeconds() { return jumpPauseSeconds; }
+    public double getVaultPauseSeconds() { return vaultPauseSeconds; }
+    public double getClimbPauseSeconds() { return climbPauseSeconds; }
+    public boolean isBlockJumpAtZeroStamina() { return blockJumpAtZeroStamina; }
     public double getClimbStaminaCostPerSecond() { return climbStaminaCostPerSecond; }
-    public double getRegenDeltaCapPerSecond() { return regenDeltaCapPerSecond; }
-    public double getHudBarWidth() { return hudBarWidth; }
+    public double getZeroWaterHpPerWaterUnit() { return zeroWaterHpPerWaterUnit; }
+    public double getZeroStaminaHpPerStamina() { return zeroStaminaHpPerStamina; }
+    public double getZeroWaterDamageIntervalSeconds() { return zeroWaterDamageIntervalSeconds; }
+    public double getZeroWaterMinHit() { return zeroWaterMinHit; }
+    public double getZeroWaterSpeedMultiplier() { return zeroWaterSpeedMultiplier; }
+    public double getRespawnWater() { return respawnWater; }
+    public double getRespawnExposure() { return respawnExposure; }
+    public double getPauseDryScale() { return pauseDryScale; }
+    public double getPauseDryExponent() { return pauseDryExponent; }
+    public double getPauseExposureScale() { return pauseExposureScale; }
+    public double getRegenDryScale() { return regenDryScale; }
+    public double getRegenDryExponent() { return regenDryExponent; }
+    public double getRegenExposureScale() { return regenExposureScale; }
+    public double getRegenWaterCostPerPoint() { return regenWaterCostPerPoint; }
+    public double getMaxPauseSeconds() { return maxPauseSeconds; }
+    public int getNaturalRegenMaxSteps() { return (int) naturalRegenMaxSteps; }
+    public double getNaturalRegenTolerance() { return naturalRegenTolerance; }
+    public String getHudMode() { return hudMode == null ? "percent" : hudMode; }
+    public double getHudEdgeMargin() { return hudEdgeMargin; }
+    public double getHudBarThickness() { return hudBarThickness; }
+    public double getHudTopPercent() { return hudTopPercent; }
+    public double getHudIconGap() { return hudIconGap; }
+    public double getHudTopMargin() { return hudTopMargin; }
+    public double getHudFixedHeight() { return hudFixedHeight; }
+    public double getHudIconSize() { return hudIconSize; }
+    public double getHudIconBottomMargin() { return hudIconBottomMargin; }
     public double getExposureRedStartPercent() { return exposureRedStartPercent; }
     public String getExposureColorOrange() { return exposureColorOrange; }
     public String getExposureColorRed() { return exposureColorRed; }
     public String getWaterColor() { return waterColor; }
-    public double getHudMinPixelChange() { return hudMinPixelChange; }
+    public double getHudMinPercentChange() { return hudMinPercentChange; }
     public double getLitrejonCapacity() { return litrejonCapacity; }
     public double getLitrejonDrinkAmount() { return litrejonDrinkAmount; }
     public boolean isLitrejonStartsFull() { return litrejonStartsFull; }

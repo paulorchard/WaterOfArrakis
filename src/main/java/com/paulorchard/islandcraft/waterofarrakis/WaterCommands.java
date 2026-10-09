@@ -74,7 +74,6 @@ final class WaterCommands {
             WaterOfArrakisConfig cfg = config.get();
             double water = service.getWater(target);
             double exposure = service.getExposure(target);
-            int tier = cfg.waterTier(water);
             Ref<EntityStore> ref = target.getReference();
             float stamina = -1;
             EntityStatMap stats = ref == null ? null : store.getComponent(ref, EntityStatMap.getComponentType());
@@ -83,16 +82,26 @@ final class WaterCommands {
             }
             var mods = service.getModifiers(target.getUuid());
             say(ctx, String.format(Locale.ROOT, "%s: water %.2f, exposure %.2f", target.getUsername(), water, exposure));
+            double pauseMult = service.getStaminaPauseMultiplier(target);
             say(ctx, String.format(Locale.ROOT,
-                    "tier %d of %d (stamina cost x%.2f, regen x%.2f), exposure step %d",
-                    tier, cfg.waterTierCount() - 1, cfg.actionStaminaCost(tier), cfg.staminaRegen(tier),
-                    service.getExposureStep(target)));
+                    "stamina pause x%.2f (water part x%.2f, heat part x%.2f, modifiers x%.2f; 1.0 is vanilla), regen speed x%.2f, "
+                            + "water per regenerated point %.4f, exposure step %d",
+                    pauseMult, StaminaCurves.dryPart(cfg, water), StaminaCurves.heatPart(cfg, exposure),
+                    mods.get(ModifierType.STAMINA_PAUSE_MULTIPLIER), service.getStaminaRegenMultiplier(target),
+                    service.getStaminaRegenWaterCost(target), service.getExposureStep(target)));
+            say(ctx, "breath: " + system.breathInfo(target.getUuid()));
             say(ctx, String.format(Locale.ROOT,
                     "drain multiplier from exposure x%.2f; modifiers: gain x%.2f, decay x%.2f, drain x%.2f, "
                             + "action drain x%.2f, offset %+.2f/s",
                     cfg.exposureDrainMultiplier(exposure), mods.get(ModifierType.EXPOSURE_GAIN_MULTIPLIER),
                     mods.get(ModifierType.EXPOSURE_DECAY_MULTIPLIER), mods.get(ModifierType.WATER_DRAIN_MULTIPLIER),
                     mods.get(ModifierType.WATER_ACTION_DRAIN_MULTIPLIER), mods.get(ModifierType.EXPOSURE_OFFSET)));
+            say(ctx, String.format(Locale.ROOT, "sprint costs %.2f stamina per second; stamina charged: %s",
+                    system.sprintCostPerSecond(), system.jumpVaultInfo(target.getUuid())));
+            int slow = system.slowPercent(target.getUuid());
+            say(ctx, String.format(Locale.ROOT, "out of water: %s; slow %s (speed modifier x%.2f); thirst damage owed %.3f HP",
+                    water <= 0 ? "YES" : "no", slow == 0 ? "none" : slow + "% of normal speed",
+                    mods.get(ModifierType.MOVEMENT_SPEED_MULTIPLIER), system.thirstOwed(target.getUuid())));
             double rate = system.exposureRate(target.getUuid());
             double shadeSeconds = system.secondsOutOfSun(target.getUuid());
             SunProbe probe = system.probeOf(target.getUuid());

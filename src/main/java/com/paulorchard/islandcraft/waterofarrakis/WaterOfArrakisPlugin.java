@@ -1,8 +1,18 @@
 package com.paulorchard.islandcraft.waterofarrakis;
 
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
 import com.hypixel.hytale.server.core.asset.type.fluid.Fluid;
+import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
+import com.hypixel.hytale.server.core.modules.entity.condition.Condition;
+import com.hypixel.hytale.server.core.modules.entity.condition.SprintingCondition;
+import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
+import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.universe.world.events.ChunkPreLoadProcessEvent;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
@@ -57,6 +67,7 @@ public class WaterOfArrakisPlugin extends JavaPlugin {
         WaterState.setComponentType(getEntityStoreRegistry().registerComponent(WaterState.class,
                 "WaterOfArrakis_State", WaterState.CODEC));
         getEntityStoreRegistry().registerSystem(system);
+        getEntityStoreRegistry().registerSystem(new ThirstDamageSystem(system));
 
         getCodecRegistry(Interaction.CODEC)
                 .register(ConsumeInteraction.TYPE, ConsumeInteraction.class, ConsumeInteraction.CODEC)
@@ -82,9 +93,12 @@ public class WaterOfArrakisPlugin extends JavaPlugin {
                 (s, p, v) -> s.setWater(p, v), (s, p, v) -> s.addWater(p, v)));
         getCommandRegistry().registerCommand(new WaterCommands.ValueCommand("exposure", service,
                 (s, p, v) -> s.setExposure(p, v), (s, p, v) -> s.addExposure(p, v)));
+        getCommandRegistry().registerCommand(new WaterCommands.ValueCommand("waterstamina", service,
+                (s, p, v) -> setStamina(p, v, false), (s, p, v) -> setStamina(p, v, true)));
         getCommandRegistry().registerCommand(WaterCommands.debug(service, system, () -> config.get()));
         getCommandRegistry().registerCommand(WaterCommands.plants(() -> config.get()));
         getCommandRegistry().registerCommand(SunProbeCommand.build(() -> config.get()));
+        getCommandRegistry().registerCommand(StaminaCurveCommand.build(() -> config.get()));
 
         getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, event -> system.forget(event.getPlayerRef().getUuid()));
     }
@@ -99,12 +113,86 @@ public class WaterOfArrakisPlugin extends JavaPlugin {
                 missing.append(' ').append(id);
             }
         }
+        for (String effect : new String[] {"Arrakis_No_Jump", WaterSystem.slowId(5), WaterSystem.slowId(90), WaterSystem.slowId(95)}) {
+            if (EntityEffect.getAssetMap().getIndex(effect) == Integer.MIN_VALUE) {
+                missing.append(' ').append(effect);
+            }
+        }
+        if (DamageCause.getAssetMap().getAsset(ThirstDamageSystem.CAUSE_ID) == null) {
+            missing.append(' ').append(ThirstDamageSystem.CAUSE_ID);
+        }
         StringBuilder fluids = new StringBuilder();
         for (String name : config.get().getWaterFluidIds()) {
             fluids.append(' ').append(name).append('=')
                     .append(Fluid.getAssetMap().getIndex(name) != Integer.MIN_VALUE ? "ok" : "missing");
         }
+        logStaminaCosts();
         getLogger().at(Level.INFO).log("Items missing:%s; water fluids:%s", missing.length() == 0 ? " none" : missing, fluids);
+    }
+
+    /**
+     * Sprint's cost is a stat rule in Stamina.json (an entry with a Sprinting condition and a negative amount). Jump and
+     * vault costs are given in seconds of sprint, so they follow it. Logs the numbers so a change is visible.
+     */
+    private void logStaminaCosts() {
+        double perSecond = 1.0;
+        double max = 0;
+        boolean found = false;
+        EntityStatType stamina = EntityStatType.getAssetMap().getAsset("Stamina");
+        if (stamina != null) {
+            max = stamina.getMax();
+            for (EntityStatType.Regenerating rule : stamina.getRegenerating()) {
+                if (rule.getAmount() >= 0 || rule.getInterval() <= 0 || rule.getConditions() == null) {
+                    continue;
+                }
+                for (Condition condition : rule.getConditions()) {
+                    if (condition instanceof SprintingCondition) {
+                        perSecond = -rule.getAmount() / rule.getInterval();
+                        found = true;
+                    }
+                }
+            }
+        }
+        system.setSprintCostPerSecond(perSecond);
+        double natural = 0.3;
+        if (stamina != null) {
+            for (EntityStatType.Regenerating rule : stamina.getRegenerating()) {
+                if (rule.getAmount() > 0 && rule.getRegenType() == EntityStatType.Regenerating.RegenType.ADDITIVE) {
+                    natural = rule.getAmount();
+                    break;
+                }
+            }
+        }
+        system.setNaturalRegenAmount(natural);
+        EntityStatType delayStat = EntityStatType.getAssetMap().getAsset("StaminaRegenDelay");
+        if (delayStat != null) {
+            for (EntityStatType.Regenerating rule : delayStat.getRegenerating()) {
+                if (rule.getAmount() > 0) {
+                    system.setDelayRefillStep(rule.getAmount());
+                    break;
+                }
+            }
+        }
+        WaterOfArrakisConfig cfg = config.get();
+        getLogger().at(Level.INFO).log("Sprint costs %.2f stamina per second in Stamina.json%s (max %.1f), stamina regenerates in steps of %.2f. Jump costs %.2f and vault %.2f at every water level (%.1f and %.1f seconds of sprint).",
+                perSecond, found ? "" : " (rule not found, assumed)", max, natural, cfg.getJumpCostSprintSeconds() * perSecond,
+                cfg.getVaultCostSprintSeconds() * perSecond, cfg.getJumpCostSprintSeconds(), cfg.getVaultCostSprintSeconds());
+    }
+
+    /** Testing aid for /waterstamina: sets or adds to the player's stamina stat and returns the new value. */
+    private static double setStamina(PlayerRef player, double value, boolean add) {
+        Ref<EntityStore> ref = player.getReference();
+        EntityStatMap stats = ref == null ? null : ref.getStore().getComponent(ref, EntityStatMap.getComponentType());
+        if (stats == null) {
+            return value;
+        }
+        int index = DefaultEntityStatTypes.getStamina();
+        if (add) {
+            stats.addStatValue(index, (float) value);
+        } else {
+            stats.setStatValue(index, (float) value);
+        }
+        return stats.get(index).get();
     }
 
     /** The server reads the config file but never creates it, so write it back on every start. */

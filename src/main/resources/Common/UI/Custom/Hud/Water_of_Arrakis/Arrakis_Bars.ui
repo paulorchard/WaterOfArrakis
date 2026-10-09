@@ -1,66 +1,104 @@
-// Water of Arrakis HUD: two bars stacked above the vanilla Health (left) and Stamina (right) bars.
-// Vanilla (Health.ui / StaminaPanel.ui): Bottom = 36 (margin) + 78 (hotbar height) + 6 = 120, Width = 702 (hotbar width), Height = 12.
-// Ours: Bottom = 120 + 12 (bar) + 7 (gap, so the 24 px icons of the upper bars clear the vanilla icons) = 139.
+// Water of Arrakis HUD: a vertical water bar on the LEFT screen edge and a vertical exposure bar on the RIGHT edge,
+// each filling from the bottom up, with its icon in the bottom corner. Reference: reference/hud-target.webp.
 //
-// Style copied from the vanilla bars (see tools/assets/make_bars.ps1): a dark background with a light rim, the outer
-// end cut on a slant (Health: left, Stamina: right), a gradient fill and a sheen. The fill is a white texture that is
-// tinted with Background.Color; the sheen sits on top and is not tinted. Fill and sheen share one size, set from code.
-// HorizontalBorder keeps the slanted end undistorted while the fill is stretched.
+// Named values. Everything except @CapSize is set again from Water_of_Arrakis.json by WaterHud when the document is
+// built, so the values here are only starting points. @CapSize lives only here.
+//   @CapSize      Height of the angled cap at the top of each bar, in on-screen pixels. It must equal the bar thickness
+//                 for the cap to be 45 degrees; the textures are drawn for 12 (tools/assets/make_bars.ps1: 24 texture
+//                 pixels = 12 on screen). It is the VerticalBorder of the 9-slice, so only the straight middle of the
+//                 texture stretches and the cap keeps its shape at every screen height.
+//   @EdgeMargin   Distance of the bar from the screen edge.
+//   @Thickness    Width of the bar.
+//   @IconSize     Size of the icon.
+//   @IconBottom   Distance of the icon from the bottom of the screen.
+//   @IconGap      Gap between the bottom of the bar and the top of its icon (4 px).
+//
+// Scaling. There is no percentage unit in .ui. Each column has Top: 0 and a fixed Bottom (icon bottom + icon size +
+// gap, so the bar always ends @IconGap above its icon) and no Height, so it spans the screen height. FlexWeight (an
+// integer) divides the column: 65 parts of space above the bar (6.5% of the column) and 935 for the bar. Inside the
+// bar, an empty part and a fill part share its length by FlexWeight (1000 - v and v), so the fill is exactly v of the
+// bar at any screen size.
+//
+// Style: the vanilla health/stamina look turned vertical (make_bars.ps1). The fill is a white texture tinted with
+// Background.Color; the sheen sits inside the fill and is not tinted.
 
-Group #WaterBar {
-  LayoutMode: Bottom;
-  Anchor: (Bottom: 139, Width: 702, Height: 12);
+@CapSize = 12;
+@EdgeMargin = 18;
+@Thickness = 12;
+@IconSize = 24;
+@IconBottom = 20;
+@IconGap = 4;
 
-  Group {
-    LayoutMode: Left;
+Group #WaterColumn {
+  LayoutMode: Top;
+  Anchor: (Left: @EdgeMargin, Width: @Thickness, Top: 0, Bottom: @IconBottom + @IconSize + @IconGap);
 
-    Group #WaterIcon {
-      Anchor: (Left: 0, Width: 24, Height: 24, Right: 4, Top: -8);
-      Background: "Arrakis_Water_Icon.png";
+  Group #WaterTop {
+    FlexWeight: 65;
+  }
+
+  Group #WaterTrack {
+    FlexWeight: 935;
+    LayoutMode: Top;
+    Background: (TexturePath: "Arrakis_Bar_V_Background_Left.png", VerticalBorder: @CapSize);
+
+    Group #WaterEmpty {
+      FlexWeight: 1000;
     }
 
-    Group {
-      Anchor: (Left: 0, Width: 318, Height: 12);
-      Background: "Arrakis_Bar_Background_Left.png";
-
-      Group #WaterFill {
-        Anchor: (Left: 0, Width: 318, Height: 12);
-        Background: (TexturePath: "Arrakis_Bar_Fill_Left.png", HorizontalBorder: 8, Color: #2f8fe0);
-      }
+    Group #WaterFill {
+      FlexWeight: 0;
+      Background: (TexturePath: "Arrakis_Bar_V_Fill_Left.png", VerticalBorder: @CapSize, Color: #2f8fe0);
 
       Group #WaterSheen {
-        Anchor: (Left: 0, Width: 318, Height: 12);
-        Background: (TexturePath: "Arrakis_Bar_Sheen_Left.png", HorizontalBorder: 8);
+        Background: (TexturePath: "Arrakis_Bar_V_Sheen_Left.png", VerticalBorder: @CapSize);
       }
     }
+  }
+
+  Group #WaterBottom {
+    FlexWeight: 0;
   }
 }
 
-Group #ExposureBar {
-  LayoutMode: Bottom;
-  Anchor: (Bottom: 139, Width: 702, Height: 12);
+Group #WaterIcon {
+  Anchor: (Left: @EdgeMargin - 6, Bottom: @IconBottom, Width: @IconSize, Height: @IconSize);
+  Background: "Arrakis_Water_Icon.png";
+}
 
-  Group {
-    LayoutMode: Right;
+Group #ExposureColumn {
+  LayoutMode: Top;
+  Anchor: (Right: @EdgeMargin, Width: @Thickness, Top: 0, Bottom: @IconBottom + @IconSize + @IconGap);
 
-    Group {
-      Anchor: (Height: 12, Width: 318);
-      Background: "Arrakis_Bar_Background_Right.png";
+  Group #ExposureTop {
+    FlexWeight: 65;
+  }
 
-      Group #ExposureFill {
-        Anchor: (Right: 0, Width: 0, Height: 12);
-        Background: (TexturePath: "Arrakis_Bar_Fill_Right.png", HorizontalBorder: 8, Color: #ff8a1f);
-      }
+  Group #ExposureTrack {
+    FlexWeight: 935;
+    LayoutMode: Top;
+    Background: (TexturePath: "Arrakis_Bar_V_Background_Right.png", VerticalBorder: @CapSize);
+
+    Group #ExposureEmpty {
+      FlexWeight: 1000;
+    }
+
+    Group #ExposureFill {
+      FlexWeight: 0;
+      Background: (TexturePath: "Arrakis_Bar_V_Fill_Right.png", VerticalBorder: @CapSize, Color: #ff8a1f);
 
       Group #ExposureSheen {
-        Anchor: (Right: 0, Width: 0, Height: 12);
-        Background: (TexturePath: "Arrakis_Bar_Sheen_Right.png", HorizontalBorder: 8);
+        Background: (TexturePath: "Arrakis_Bar_V_Sheen_Right.png", VerticalBorder: @CapSize);
       }
     }
-
-    Group #ExposureIcon {
-      Anchor: (Width: 24, Height: 24, Left: 4, Top: -10);
-      Background: "Arrakis_Sun_Icon.png";
-    }
   }
+
+  Group #ExposureBottom {
+    FlexWeight: 0;
+  }
+}
+
+Group #ExposureIcon {
+  Anchor: (Right: @EdgeMargin - 6, Bottom: @IconBottom, Width: @IconSize, Height: @IconSize);
+  Background: "Arrakis_Sun_Icon.png";
 }

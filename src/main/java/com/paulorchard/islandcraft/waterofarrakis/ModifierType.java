@@ -19,6 +19,21 @@ public enum ModifierType {
      * {@link WaterService#setWorldSunIntensity}. Default 1.
      */
     SUN_INTENSITY_MULTIPLIER(1.0),
+    /**
+     * Multiplies the player's movement speed (walk, run, sprint, strafe): 0.9 is 10% slower. The mod itself registers
+     * one under the id "Arrakis:ZeroWater" while water is 0; others stack with it (the product is used, snapped to
+     * the nearest 5% and clamped to 5%..100%). Default 1.
+     */
+    MOVEMENT_SPEED_MULTIPLIER(1.0),
+    /**
+     * Multiplies the stamina regeneration pause (see StaminaCurves: 1.0 at full water and no exposure, up to 8 at 0
+     * water). A cooling item might use 0.7. Default 1.
+     */
+    STAMINA_PAUSE_MULTIPLIER(1.0),
+    /** Multiplies how fast stamina regenerates (after the water and heat curve). Default 1. */
+    STAMINA_REGEN_MULTIPLIER(1.0),
+    /** Multiplies the water that each point of regenerated stamina costs. 0 makes catching your breath free. Default 1. */
+    STAMINA_REGEN_WATER_COST_MULTIPLIER(1.0),
     /** Flat exposure change in percent per second, added after gain and decay. Negative cools. Default 0. */
     EXPOSURE_OFFSET(0.0);
 

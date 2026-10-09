@@ -17,13 +17,6 @@ public interface WaterListener {
     }
 
     /**
-     * The water tier changed (tier 0 is the best, see {@code WaterTierLowerBounds} in the config), by drinking,
-     * draining, or a command.
-     */
-    default void onWaterTierChanged(PlayerRef player, int oldTier, int newTier) {
-    }
-
-    /**
      * Exposure crossed into a different drain step (every {@code ExposureDrainStepPercent}, so every 10% by default).
      * The water drain multiplier changes with the step.
      */

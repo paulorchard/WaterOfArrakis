@@ -1,0 +1,10 @@
+{
+  "$Comment": "Kept on a player at 0 stamina when BlockJumpAtZeroStamina is on: the engine disables the jump control. Short, so it ends by itself.",
+  "ApplicationEffects": {
+    "MovementEffects": {
+      "DisableJump": true
+    }
+  },
+  "Duration": 0.6,
+  "OverlapBehavior": "Overwrite"
+}
